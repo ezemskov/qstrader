@@ -45,4 +45,9 @@ class BuyAndHoldRebalance(Rebalance):
             rebalance_date = self.start_dt + BusinessDay()
         else:
             rebalance_date = self.start_dt
-        return [rebalance_date]
+
+        # The daily simulation emits trading events only at 14:30 (open) and
+        # 21:00 UTC (close). Scheduling at start_dt's arbitrary time (the
+        # examples use 10:00 UTC) means the sole buy-and-hold rebalance is
+        # never observed and the benchmark remains entirely in cash.
+        return [rebalance_date.normalize() + pd.Timedelta(hours=21)]
