@@ -6,6 +6,7 @@ import pytz
 from qstrader.alpha_model.fixed_signals import FixedSignalsAlphaModel
 from qstrader.asset.equity import Equity
 from qstrader.asset.universe.static import StaticUniverse
+from qstrader.broker.fee_model.fixed_fee_model import FixedFeeModel
 from qstrader.broker.fee_model.percent_fee_model import PercentFeeModel
 from qstrader.broker.fee_model.zero_fee_model import ZeroFeeModel
 from qstrader.data.backtest_data_handler import BacktestDataHandler
@@ -15,8 +16,8 @@ from qstrader.trading.backtest import BacktestTradingSession
 
 
 if __name__ == "__main__":
-    start_dt = pd.Timestamp('2003-09-30 14:30:00', tz=pytz.UTC)
-    end_dt = pd.Timestamp('2019-12-31 23:59:00', tz=pytz.UTC)
+    start_dt = pd.Timestamp('2025-01-31 10:00:00', tz=pytz.UTC)
+    end_dt = pd.Timestamp('2026-01-01 10:00:00', tz=pytz.UTC)
 
     # Construct the symbols and assets necessary for the backtest
     strategy_symbols = ['SPY', 'AGG']
@@ -30,7 +31,7 @@ if __name__ == "__main__":
     data_handler = BacktestDataHandler(strategy_universe, data_sources=[data_source])
 
     # Construct the transaction cost modelling - fees/slippage
-    fee_model = PercentFeeModel(commission_pct=0.1 / 100.0, tax_pct=0.5 / 100.0)
+    fee_model = FixedFeeModel(commission=2.0)
 
     # Construct an Alpha Model that simply provides
     # static allocations to a universe of assets
@@ -44,7 +45,8 @@ if __name__ == "__main__":
         strategy_alpha_model,
         rebalance='end_of_month',
         long_only=True,
-        cash_buffer_percentage=0.01,
+        initial_cash=20000,
+        cash_buffer_percentage=0.1,
         data_handler=data_handler,
         fee_model=fee_model
     )
