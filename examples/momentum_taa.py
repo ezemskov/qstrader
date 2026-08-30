@@ -149,9 +149,9 @@ class TopNMomentumAlphaModel(AlphaModel):
 
 if __name__ == "__main__":
     # Duration of the backtest
-    start_dt = pd.Timestamp('1998-12-22 14:30:00', tz=pytz.UTC)
-    burn_in_dt = pd.Timestamp('1999-12-22 14:30:00', tz=pytz.UTC)
-    end_dt = pd.Timestamp('2020-12-31 23:59:00', tz=pytz.UTC)
+    start_dt = pd.Timestamp('2025-01-01 10:00:00', tz=pytz.UTC)
+    burn_in_dt = pd.Timestamp('2025-01-10 10:00:00', tz=pytz.UTC)
+    end_dt = pd.Timestamp('2026-08-01 10:00:00', tz=pytz.UTC)
 
     # Model parameters
     mom_lookback = 126  # Six months worth of business days
@@ -159,14 +159,13 @@ if __name__ == "__main__":
 
     # Construct the symbols and assets necessary for the backtest
     # This utilises the SPDR US sector ETFs, all beginning with XL
-    strategy_symbols = ['XL%s' % sector for sector in "BCEFIKPUVY"]
+    strategy_symbols = ['WOW', 'COL', 'WES', 'MTS']
     assets = ['EQ:%s' % symbol for symbol in strategy_symbols]
 
     # As this is a dynamic universe of assets (XLC is added later)
     # we need to tell QSTrader when XLC can be included. This is
     # achieved using an asset dates dictionary
     asset_dates = {asset: start_dt for asset in assets}
-    asset_dates['EQ:XLC'] = pd.Timestamp('2018-06-18 00:00:00', tz=pytz.UTC)
     strategy_universe = DynamicUniverse(asset_dates)
 
     # To avoid loading all CSV files in the directory, set the
@@ -200,16 +199,16 @@ if __name__ == "__main__":
     )
     strategy_backtest.run()
 
-    # Construct benchmark assets (buy & hold SPY)
-    benchmark_symbols = ['SPY']
-    benchmark_assets = ['EQ:SPY']
+    # Construct benchmark assets (buy & hold)
+    benchmark_symbols = ['IVV']
+    benchmark_assets = ['EQ:IVV']
     benchmark_universe = StaticUniverse(benchmark_assets)
     benchmark_data_source = CSVDailyBarDataSource(csv_dir, Equity, csv_symbols=benchmark_symbols)
     benchmark_data_handler = BacktestDataHandler(benchmark_universe, data_sources=[benchmark_data_source])
 
     # Construct a benchmark Alpha Model that provides
-    # 100% static allocation to the SPY ETF, with no rebalance
-    benchmark_alpha_model = FixedSignalsAlphaModel({'EQ:SPY': 1.0})
+    # 100% static allocation to the IVV, with no rebalance
+    benchmark_alpha_model = FixedSignalsAlphaModel({'EQ:IVV': 1.0})
     benchmark_backtest = BacktestTradingSession(
         burn_in_dt,
         end_dt,
@@ -226,6 +225,6 @@ if __name__ == "__main__":
     tearsheet = TearsheetStatistics(
         strategy_equity=strategy_backtest.get_equity_curve(),
         benchmark_equity=benchmark_backtest.get_equity_curve(),
-        title='US Sector Momentum - Top 3 Sectors'
+        title='Momentum'
     )
     tearsheet.plot_results()
