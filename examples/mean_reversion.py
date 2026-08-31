@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import pandas as pd
 import pytz
 
@@ -19,24 +20,36 @@ class MeanReversionAlphaModel(AlphaModel):
         self.signals = signals
         self.lookback_window_size = lookback_window_size
         self.universe = universe
+        self.target_weight = 0.0
 
     def __call__(self, dt):
         asset = self.universe.get_assets(dt)[0]
-        weights = {asset: 0.0}
+        weights = {asset: self.target_weight}
 
         # The signal buffers require a full lookback window before an
         # average can be calculated. Until then, remain unallocated.
         if self.signals.warmup < self.lookback_window_size:
-            return weights
+           return weights
 
-        avg = self.signals['sma'](asset, self.lookback_window_size)
-        if avg < 5:
-            weights[asset] = 1.0
+        sma_signal = self.signals['sma']
+        prices = sma_signal.buffers.prices[
+            '%s_%s' % (asset, self.lookback_window_size)
+        ]
+        asset_price_at_dt = prices[-1]
+        avg = sma_signal(asset, self.lookback_window_size)
+        stdev = np.std(prices)
 
+        print(f"Price {asset_price_at_dt:.2f} avg {avg:.2f} stdev {stdev:.2f}")
+        if asset_price_at_dt < avg - stdev:
+           self.target_weight = 1.0
+        if asset_price_at_dt > avg + stdev:
+           self.target_weight = 0.0
+
+        weights[asset] = self.target_weight
         return weights
 
 if __name__ == "__main__":
-    start_dt = pd.Timestamp('2025-01-31 10:00:00', tz=pytz.UTC)
+    start_dt = pd.Timestamp('2025-01-01 10:00:00', tz=pytz.UTC)
     end_dt = pd.Timestamp('2026-08-01 10:00:00', tz=pytz.UTC)
 
     lookback_window_size = 40  # Business days
@@ -63,9 +76,10 @@ if __name__ == "__main__":
         end_dt,
         strategy_universe,
         strategy_alpha_model,
+        signals=signals,
         rebalance='daily',
         long_only=True,
-        cash_buffer_percentage=0.1,
+        cash_buffer_percentage=0.0,
         initial_cash=20000,
         data_handler=data_handler
     )
