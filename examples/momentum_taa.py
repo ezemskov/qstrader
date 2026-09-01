@@ -10,6 +10,8 @@ from qstrader.asset.equity import Equity
 from qstrader.asset.universe.dynamic import DynamicUniverse
 from qstrader.asset.universe.static import StaticUniverse
 from qstrader.signals.momentum import MomentumSignal
+from qstrader.broker.fee_model.fixed_fee_model import FixedFeeModel
+from qstrader.broker.fee_model.zero_fee_model import ZeroFeeModel
 from qstrader.signals.signals_collection import SignalsCollection
 from qstrader.data.backtest_data_handler import BacktestDataHandler
 from qstrader.data.daily_bar_csv import CSVDailyBarDataSource
@@ -143,7 +145,7 @@ class TopNMomentumAlphaModel(AlphaModel):
         # Only generate weights if the current time exceeds the
         # momentum lookback period
         if self.signals.warmup >= self.mom_lookback:
-            weights = self._generate_signals(dt, weights)
+           weights = self._generate_signals(dt, weights)
         return weights
 
 
@@ -159,7 +161,7 @@ if __name__ == "__main__":
 
     # Construct the symbols and assets necessary for the backtest
     # This utilises the SPDR US sector ETFs, all beginning with XL
-    strategy_symbols = ['WOW', 'COL', 'WES', 'MTS']
+    strategy_symbols = ['WBC', 'NAB', 'CBA', 'ANZ', 'MQG',  'BOQ', 'BEN']
     assets = ['EQ:%s' % symbol for symbol in strategy_symbols]
 
     # As this is a dynamic universe of assets (XLC is added later)
@@ -191,24 +193,27 @@ if __name__ == "__main__":
         strategy_universe,
         strategy_alpha_model,
         signals=signals,
-        rebalance='end_of_month',
+        rebalance='daily',
+        #rebalance='weekly',
+        rebalance_weekday = 'MON',
         long_only=True,
         cash_buffer_percentage=0.01,
         burn_in_dt=burn_in_dt,
-        data_handler=strategy_data_handler
+        data_handler=strategy_data_handler,
+        fee_model=ZeroFeeModel()
     )
     strategy_backtest.run()
 
     # Construct benchmark assets (buy & hold)
-    benchmark_symbols = ['IVV']
-    benchmark_assets = ['EQ:IVV']
+    benchmark_symbols = ['MVB']
+    benchmark_assets = ['EQ:MVB']
     benchmark_universe = StaticUniverse(benchmark_assets)
     benchmark_data_source = CSVDailyBarDataSource(csv_dir, Equity, csv_symbols=benchmark_symbols)
     benchmark_data_handler = BacktestDataHandler(benchmark_universe, data_sources=[benchmark_data_source])
 
     # Construct a benchmark Alpha Model that provides
     # 100% static allocation to the IVV, with no rebalance
-    benchmark_alpha_model = FixedSignalsAlphaModel({'EQ:IVV': 1.0})
+    benchmark_alpha_model = FixedSignalsAlphaModel({'EQ:MVB': 1.0})
     benchmark_backtest = BacktestTradingSession(
         burn_in_dt,
         end_dt,
