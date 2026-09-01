@@ -45,13 +45,15 @@ class MeanReversionAlphaModel(AlphaModel):
 
 if __name__ == "__main__":
     start_dt = pd.Timestamp('2025-01-01 10:00:00', tz=pytz.UTC)
-    end_dt = pd.Timestamp('2025-08-01 10:00:00', tz=pytz.UTC)
+    end_dt = pd.Timestamp('2026-08-01 10:00:00', tz=pytz.UTC)
 
     lookback_window_size = 40  # Business days
 
     # Construct the symbols and assets necessary for the backtest
-    strategy_symbols = ['MEZ']
-    strategy_assets = ['EQ:%s' % symbol for symbol in strategy_symbols]
+    the_symbol = 'GNE'
+    the_eq_symbol = 'EQ:%s' % the_symbol
+    strategy_symbols = [the_symbol]
+    strategy_assets = [the_eq_symbol]
     strategy_universe = StaticUniverse(strategy_assets)
 
     # To avoid loading all CSV files in the directory, set the
@@ -82,13 +84,12 @@ if __name__ == "__main__":
     )
     strategy_backtest.run()
 
-    # Construct benchmark assets (buy & hold SPY)
-    benchmark_assets = ['EQ:MEZ']
-    benchmark_universe = StaticUniverse(benchmark_assets)
+    # Construct benchmark assets
+    benchmark_universe = StaticUniverse(strategy_assets)
 
     # Construct a benchmark Alpha Model that provides
     # 100% static allocation to the SPY ETF, with no rebalance
-    benchmark_alpha_model = FixedSignalsAlphaModel({'EQ:MEZ': 1.0})
+    benchmark_alpha_model = FixedSignalsAlphaModel({the_eq_symbol: 1.0})
     benchmark_backtest = BacktestTradingSession(
         start_dt,
         end_dt,
@@ -105,7 +106,7 @@ if __name__ == "__main__":
     tearsheet = TearsheetStatistics(
         strategy_equity=strategy_backtest.get_equity_curve(),
         benchmark_equity=benchmark_backtest.get_equity_curve(),
-        title='MEZ mean reversion',
-        signal_history=signal.get_history('EQ:MEZ', lookback_window_size)
+        title=f'{the_symbol} mean reversion',
+        signal_history=signal.get_history(the_eq_symbol, lookback_window_size)
     )
     tearsheet.plot_results()
