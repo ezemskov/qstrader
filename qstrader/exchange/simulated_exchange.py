@@ -49,4 +49,7 @@ class SimulatedExchange(Exchange):
         """
         if dt.weekday() > 4:
             return False
-        return self.open_dt <= dt.time() and dt.time() < self.close_dt
+        # A close timestamp represents the final tradable instant of the
+        # daily bar. This permits orders generated from that bar's close
+        # signal to execute immediately at its close price.
+        return self.open_dt <= dt.time() and dt.time() <= self.close_dt
