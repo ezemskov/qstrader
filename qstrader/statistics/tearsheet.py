@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.dates as mdates
 import numpy as np
+import pandas as pd
 import seaborn as sns
 
 import qstrader.statistics.performance as perf
@@ -92,8 +93,12 @@ class TearsheetStatistics(Statistics):
         plt.setp(ax.get_xticklabels(), visible=True, rotation=45, ha='right')
         return ax
 
-    def _plot_signals(self, signal_history, ax=None):
-        """Plot price, moving average, and one-standard-deviation bands."""
+    def _plot_signals(self, signal_history, equity_index, ax=None):
+        """Plot price, moving average, and one-standard-deviation bands.
+
+        Signal history is padded with its first available values to the strategy
+        equity index so this chart has the same time range as cumulative returns.
+        """
         if ax is None:
             ax = plt.gca()
 
@@ -101,26 +106,36 @@ class TearsheetStatistics(Statistics):
             ax.set_visible(False)
             return ax
 
-        signal_history['Price'].plot(
-            ax=ax, color='black', lw=1.0, label='Price'
-        )
-        signal_history['Average'].plot(
-            ax=ax, color='royalblue', lw=1.5, label='Moving Average'
-        )
-        signal_history['Lower Band'].plot(
-            ax=ax, color='firebrick', lw=1.0, ls='--',
-            label='Average - 1 Stdev'
-        )
-        signal_history['Upper Band'].plot(
-            ax=ax, color='firebrick', lw=1.0, ls='--',
-            label='Average + 1 Stdev'
-        )
+        signal_history = signal_history.copy()
+        signal_history.index = pd.to_datetime(
+            signal_history.index, utc=True
+        ).tz_localize(None).normalize()
+        equity_index = pd.DatetimeIndex(pd.to_datetime(equity_index)).normalize()
+        signal_history = signal_history.reindex(equity_index).bfill().ffill()
+
+        # Use Matplotlib datetime values rather than Pandas' period plotting
+        # adapter, so this axis shares the same calendar scale as the equity
+        # and drawdown charts.
+        plot_dates = signal_history.index.to_pydatetime()
+        ax.plot(plot_dates, signal_history['Price'].to_numpy(),
+                color='black', lw=1.0, label='Price')
+        ax.plot(plot_dates, signal_history['Average'].to_numpy(),
+                color='royalblue', lw=1.5, label='Moving Average')
+        ax.plot(plot_dates, signal_history['Lower Band'].to_numpy(),
+                color='firebrick', lw=1.0, ls='--',
+                label='Average - 1 Stdev')
+        ax.plot(plot_dates, signal_history['Upper Band'].to_numpy(),
+                color='firebrick', lw=1.0, ls='--',
+                label='Average + 1 Stdev')
         ax.fill_between(
-            signal_history.index,
-            signal_history['Lower Band'],
-            signal_history['Upper Band'],
+            plot_dates,
+            signal_history['Lower Band'].to_numpy(),
+            signal_history['Upper Band'].to_numpy(),
             color='firebrick', alpha=0.08
         )
+        # Match Matplotlib's default five-percent x margin used by the
+        # cumulative-return and drawdown charts.
+        ax.margins(x=0.05)
         ax.set_title('Mean-Reversion Signal', fontweight='bold')
         ax.set_ylabel('Price')
         ax.xaxis.set_major_locator(mdates.MonthLocator(bymonthday=1))
@@ -360,7 +375,9 @@ class TearsheetStatistics(Statistics):
 
         self._plot_equity(stats, bench_stats=bench_stats, ax=ax_equity)
         if ax_signals is not None:
-            self._plot_signals(self.signal_history, ax=ax_signals)
+            self._plot_signals(
+                self.signal_history, stats['cum_returns'].index, ax=ax_signals
+            )
         self._plot_drawdown(stats, ax=ax_drawdown)
         self._plot_monthly_returns(stats, ax=ax_monthly_returns)
         self._plot_yearly_returns(stats, ax=ax_yearly_returns)
