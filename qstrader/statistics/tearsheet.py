@@ -73,8 +73,8 @@ class TearsheetStatistics(Statistics):
         ax.yaxis.set_major_formatter(FuncFormatter(y_axis_formatter))
         ax.xaxis.set_tick_params(reset=True)
         ax.yaxis.grid(linestyle=':')
-        ax.xaxis.set_major_locator(mdates.YearLocator(1))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+        ax.xaxis.set_major_locator(mdates.MonthLocator(bymonthday=1))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%b\n%Y'))
         ax.xaxis.grid(linestyle=':')
 
         equity.plot(lw=2, color='green', alpha=0.6, x_compat=False,
@@ -89,7 +89,7 @@ class TearsheetStatistics(Statistics):
         ax.set_ylabel('Cumulative returns')
         ax.legend(loc='best')
         ax.set_xlabel('')
-        plt.setp(ax.get_xticklabels(), visible=True, rotation=0, ha='center')
+        plt.setp(ax.get_xticklabels(), visible=True, rotation=45, ha='right')
         return ax
 
     def _plot_signals(self, signal_history, ax=None):
@@ -123,10 +123,11 @@ class TearsheetStatistics(Statistics):
         )
         ax.set_title('Mean-Reversion Signal', fontweight='bold')
         ax.set_ylabel('Price')
-        ax.xaxis.set_major_locator(mdates.YearLocator(1))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+        ax.xaxis.set_major_locator(mdates.MonthLocator(bymonthday=1))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%b\n%Y'))
         ax.yaxis.grid(linestyle=':')
         ax.xaxis.grid(linestyle=':')
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
         ax.legend(loc='best', ncol=2)
         return ax
 
@@ -146,15 +147,15 @@ class TearsheetStatistics(Statistics):
         ax.yaxis.set_major_formatter(FuncFormatter(y_axis_formatter))
         ax.yaxis.grid(linestyle=':')
         ax.xaxis.set_tick_params(reset=True)
-        ax.xaxis.set_major_locator(mdates.YearLocator(1))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+        ax.xaxis.set_major_locator(mdates.MonthLocator(bymonthday=1))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%b\n%Y'))
         ax.xaxis.grid(linestyle=':')
 
         underwater = -100 * drawdown
         underwater.plot(ax=ax, lw=2, kind='area', color='red', alpha=0.3, **kwargs)
         ax.set_ylabel('')
         ax.set_xlabel('')
-        plt.setp(ax.get_xticklabels(), visible=True, rotation=0, ha='center')
+        plt.setp(ax.get_xticklabels(), visible=True, rotation=45, ha='right')
         ax.set_title('Drawdown (%)', fontweight='bold')
         return ax
 
