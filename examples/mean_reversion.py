@@ -24,28 +24,27 @@ class MeanReversionAlphaModel(AlphaModel):
 
     def __call__(self, dt):
         asset = self.universe.get_assets(dt)[0]
-        weights = {asset: self.target_weight}
 
         # The signal buffers require a full lookback window before an
         # average can be calculated. Until then, remain unallocated.
-        if self.signals.warmup < self.lookback_window_size:
-           return weights
+        if self.signals.warmup >= self.lookback_window_size:
+            sma_signal = self.signals['sma']
+            prices = sma_signal.buffers.prices[
+               '%s_%s' % (asset, self.lookback_window_size)
+            ]
+            asset_price_at_dt = prices[-1]
+            avg = sma_signal(asset, self.lookback_window_size)
+            stdev = np.std(prices)
 
-        sma_signal = self.signals['sma']
-        prices = sma_signal.buffers.prices[
-            '%s_%s' % (asset, self.lookback_window_size)
-        ]
-        asset_price_at_dt = prices[-1]
-        avg = sma_signal(asset, self.lookback_window_size)
-        stdev = np.std(prices)
+            print(f"Price {asset_price_at_dt:.2f} avg {avg:.2f} stdev {stdev:.2f}")
+            if (self.target_weight > 0) and (asset_price_at_dt < avg - 2*stdev):    #stop loss sell
+               self.target_weight = 0.0
+            if asset_price_at_dt < avg - stdev:     #planned buy
+               self.target_weight = 1.0
+            if asset_price_at_dt > avg + stdev:       #planned sell 
+               self.target_weight = 0.0
 
-        print(f"Price {asset_price_at_dt:.2f} avg {avg:.2f} stdev {stdev:.2f}")
-        if asset_price_at_dt < avg - stdev:
-           self.target_weight = 1.0
-        if asset_price_at_dt > avg + stdev:
-           self.target_weight = 0.0
-
-        weights[asset] = self.target_weight
+        weights = {asset: self.target_weight}
         return weights
 
 if __name__ == "__main__":
