@@ -58,5 +58,5 @@ class SignalsCollection(object):
             assets = signal.assets
             for asset in assets:
                 price = self.data_handler.get_asset_latest_mid_price(dt, asset)
-                self.signals[name].append(asset, price)
+                self.signals[name].append(asset, price, dt)
         self.warmup += 1

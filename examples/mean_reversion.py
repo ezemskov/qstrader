@@ -1,13 +1,12 @@
 import os
 
-import numpy as np
 import pandas as pd
 import pytz
 
 from qstrader.alpha_model.alpha_model import AlphaModel
 from qstrader.alpha_model.fixed_signals import FixedSignalsAlphaModel
 from qstrader.asset.equity import Equity
-from qstrader.signals.sma import SMASignal
+from qstrader.signals.mean_reversion import MeanReversionSignal
 from qstrader.signals.signals_collection import SignalsCollection
 from qstrader.asset.universe.static import StaticUniverse
 from qstrader.data.backtest_data_handler import BacktestDataHandler
@@ -28,28 +27,25 @@ class MeanReversionAlphaModel(AlphaModel):
         # The signal buffers require a full lookback window before an
         # average can be calculated. Until then, remain unallocated.
         if self.signals.warmup >= self.lookback_window_size:
-            sma_signal = self.signals['sma']
-            prices = sma_signal.buffers.prices[
-               '%s_%s' % (asset, self.lookback_window_size)
-            ]
-            asset_price_at_dt = prices[-1]
-            avg = sma_signal(asset, self.lookback_window_size)
-            stdev = np.std(prices)
+            asset_price_at_dt, avg, stdev, lower_band, upper_band = \
+                self.signals['mean_reversion'](
+                    asset, self.lookback_window_size
+                )
 
             print(f"Price {asset_price_at_dt:.2f} avg {avg:.2f} stdev {stdev:.2f}")
-            if (self.target_weight > 0) and (asset_price_at_dt < avg - 2*stdev):    #stop loss sell
-               self.target_weight = 0.0
-            if asset_price_at_dt < avg - stdev:     #planned buy
-               self.target_weight = 1.0
-            if asset_price_at_dt > avg + stdev:       #planned sell 
-               self.target_weight = 0.0
+            if (self.target_weight > 0) and (asset_price_at_dt < avg - 2 * stdev):
+                self.target_weight = 0.0  # Stop-loss sell
+            if asset_price_at_dt < lower_band:
+                self.target_weight = 1.0  # Planned buy
+            if asset_price_at_dt > upper_band:
+                self.target_weight = 0.0  # Planned sell
 
         weights = {asset: self.target_weight}
         return weights
 
 if __name__ == "__main__":
     start_dt = pd.Timestamp('2025-01-01 10:00:00', tz=pytz.UTC)
-    end_dt = pd.Timestamp('2026-08-01 10:00:00', tz=pytz.UTC)
+    end_dt = pd.Timestamp('2025-08-01 10:00:00', tz=pytz.UTC)
 
     lookback_window_size = 40  # Business days
 
@@ -64,8 +60,10 @@ if __name__ == "__main__":
     data_source = CSVDailyBarDataSource(csv_dir, Equity, csv_symbols=strategy_symbols)
     data_handler = BacktestDataHandler(strategy_universe, data_sources=[data_source])
 
-    signal = SMASignal(start_dt, strategy_universe, lookbacks=[lookback_window_size])
-    signals = SignalsCollection({'sma': signal}, data_handler)
+    signal = MeanReversionSignal(
+        start_dt, strategy_universe, lookbacks=[lookback_window_size]
+    )
+    signals = SignalsCollection({'mean_reversion': signal}, data_handler)
 
     strategy_alpha_model = MeanReversionAlphaModel(
         signals, lookback_window_size, strategy_universe
@@ -107,6 +105,7 @@ if __name__ == "__main__":
     tearsheet = TearsheetStatistics(
         strategy_equity=strategy_backtest.get_equity_curve(),
         benchmark_equity=benchmark_backtest.get_equity_curve(),
-        title='MEZ mean reversion'
+        title='MEZ mean reversion',
+        signal_history=signal.get_history('EQ:MEZ', lookback_window_size)
     )
     tearsheet.plot_results()

@@ -40,7 +40,7 @@ class Signal(object):
             self.assets, lookbacks=self.lookbacks
         )
 
-    def append(self, asset, price):
+    def append(self, asset, price, dt=None):
         """
         Append a new price onto the price buffer for
         the specific asset provided.
@@ -51,6 +51,9 @@ class Signal(object):
             The asset symbol name.
         price : `float`
             The new price of the asset.
+        dt : `pd.Timestamp`, optional
+            The timestamp of the price. Base signals do not use this value;
+            signals that retain plotting history may do so.
         """
         self.buffers.append(asset, price)
 

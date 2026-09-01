@@ -21,12 +21,14 @@ class TearsheetStatistics(Statistics):
         strategy_equity,
         benchmark_equity=None,
         title=None,
-        periods=252
+        periods=252,
+        signal_history=None
     ):
         self.strategy_equity = strategy_equity
         self.benchmark_equity = benchmark_equity
         self.title = title
         self.periods = periods
+        self.signal_history = signal_history
 
     def get_results(self, equity_df):
         """
@@ -88,6 +90,44 @@ class TearsheetStatistics(Statistics):
         ax.legend(loc='best')
         ax.set_xlabel('')
         plt.setp(ax.get_xticklabels(), visible=True, rotation=0, ha='center')
+        return ax
+
+    def _plot_signals(self, signal_history, ax=None):
+        """Plot price, moving average, and one-standard-deviation bands."""
+        if ax is None:
+            ax = plt.gca()
+
+        if signal_history is None or signal_history.empty:
+            ax.set_visible(False)
+            return ax
+
+        signal_history['Price'].plot(
+            ax=ax, color='black', lw=1.0, label='Price'
+        )
+        signal_history['Average'].plot(
+            ax=ax, color='royalblue', lw=1.5, label='Moving Average'
+        )
+        signal_history['Lower Band'].plot(
+            ax=ax, color='firebrick', lw=1.0, ls='--',
+            label='Average - 1 Stdev'
+        )
+        signal_history['Upper Band'].plot(
+            ax=ax, color='firebrick', lw=1.0, ls='--',
+            label='Average + 1 Stdev'
+        )
+        ax.fill_between(
+            signal_history.index,
+            signal_history['Lower Band'],
+            signal_history['Upper Band'],
+            color='firebrick', alpha=0.08
+        )
+        ax.set_title('Mean-Reversion Signal', fontweight='bold')
+        ax.set_ylabel('Price')
+        ax.xaxis.set_major_locator(mdates.YearLocator(1))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+        ax.yaxis.grid(linestyle=':')
+        ax.xaxis.grid(linestyle=':')
+        ax.legend(loc='best', ncol=2)
         return ax
 
     def _plot_drawdown(self, stats, ax=None, **kwargs):
@@ -290,8 +330,11 @@ class TearsheetStatistics(Statistics):
         sns.set_style("whitegrid")
         sns.set_palette("deep", desat=.6)
 
-        vertical_sections = 5
-        fig = plt.figure(figsize=(16, 12))
+        has_signal_history = (
+            self.signal_history is not None and not self.signal_history.empty
+        )
+        vertical_sections = 6 if has_signal_history else 5
+        fig = plt.figure(figsize=(16, 14 if has_signal_history else 12))
         fig.suptitle(self.title, y=0.94, weight='bold')
         gs = gridspec.GridSpec(vertical_sections, 3, wspace=0.25, hspace=0.5)
 
@@ -301,14 +344,22 @@ class TearsheetStatistics(Statistics):
             bench_stats = self.get_results(self.benchmark_equity)
 
         ax_equity = plt.subplot(gs[:2, :])
-        ax_drawdown = plt.subplot(gs[2, :])
-        ax_monthly_returns = plt.subplot(gs[3, :2])
-        ax_yearly_returns = plt.subplot(gs[3, 2])
-        ax_txt_curve = plt.subplot(gs[4, 0])
-        # ax_txt_trade = plt.subplot(gs[4, 1])
-        # ax_txt_time = plt.subplot(gs[4, 2])
+        if has_signal_history:
+            ax_signals = plt.subplot(gs[2, :])
+            drawdown_row = 3
+        else:
+            ax_signals = None
+            drawdown_row = 2
+        ax_drawdown = plt.subplot(gs[drawdown_row, :])
+        ax_monthly_returns = plt.subplot(gs[drawdown_row + 1, :2])
+        ax_yearly_returns = plt.subplot(gs[drawdown_row + 1, 2])
+        ax_txt_curve = plt.subplot(gs[drawdown_row + 2, 0])
+        # ax_txt_trade = plt.subplot(gs[drawdown_row + 2, 1])
+        # ax_txt_time = plt.subplot(gs[drawdown_row + 2, 2])
 
         self._plot_equity(stats, bench_stats=bench_stats, ax=ax_equity)
+        if ax_signals is not None:
+            self._plot_signals(self.signal_history, ax=ax_signals)
         self._plot_drawdown(stats, ax=ax_drawdown)
         self._plot_monthly_returns(stats, ax=ax_monthly_returns)
         self._plot_yearly_returns(stats, ax=ax_yearly_returns)
