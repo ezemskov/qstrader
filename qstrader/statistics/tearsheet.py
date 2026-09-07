@@ -123,10 +123,10 @@ class TearsheetStatistics(Statistics):
                 color='royalblue', lw=1.5, label='Moving Average')
         ax.plot(plot_dates, signal_history['Lower Band'].to_numpy(),
                 color='firebrick', lw=1.0, ls='--',
-                label='Average - 1 Stdev')
+                label='Average - N*Stdev')
         ax.plot(plot_dates, signal_history['Upper Band'].to_numpy(),
                 color='firebrick', lw=1.0, ls='--',
-                label='Average + 1 Stdev')
+                label='Average + N*Stdev')
         ax.fill_between(
             plot_dates,
             signal_history['Lower Band'].to_numpy(),

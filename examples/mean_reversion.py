@@ -20,6 +20,7 @@ class MeanReversionAlphaModel(AlphaModel):
         self.lookback_window_size = lookback_window_size
         self.universe = universe
         self.target_weight = 0.0
+        self.last_buy_price = 0.0
 
     def __call__(self, dt):
         asset = self.universe.get_assets(dt)[0]
@@ -32,13 +33,21 @@ class MeanReversionAlphaModel(AlphaModel):
                     asset, self.lookback_window_size
                 )
 
-            print(f"Price {asset_price_at_dt:.2f} avg {avg:.2f} stdev {stdev:.2f}")
-            if (self.target_weight > 0) and (asset_price_at_dt < avg - 2 * stdev):
-                self.target_weight = 0.0  # Stop-loss sell
+            prev_weight = self.target_weight
+            stop_loss_band = 2 * stdev
+
+            loss = max(self.last_buy_price - asset_price_at_dt, 0)
+            print(f"Price {asset_price_at_dt:.2f} avg {avg:.2f} stdev {stdev:.2f} bought at {self.last_buy_price:.2f} loss {loss:.2f}")
             if asset_price_at_dt < lower_band:
-                self.target_weight = 1.0  # Planned buy
+                self.target_weight = 1.0  # Planned buy                
             if asset_price_at_dt > upper_band:
                 self.target_weight = 0.0  # Planned sell
+
+            if (self.target_weight > prev_weight):
+                self.last_buy_price = asset_price_at_dt
+
+            if (self.target_weight > 0) and (loss > stop_loss_band):
+                self.target_weight = 0.0    # Stop-loss sell
 
         weights = {asset: self.target_weight}
         return weights
@@ -47,10 +56,10 @@ if __name__ == "__main__":
     start_dt = pd.Timestamp('2025-01-01 10:00:00', tz=pytz.UTC)
     end_dt = pd.Timestamp('2026-08-01 10:00:00', tz=pytz.UTC)
 
-    lookback_window_size = 40  # Business days
+    lookback_window_size = 20  # Business days
 
     # Construct the symbols and assets necessary for the backtest
-    the_symbol = 'MCY'
+    the_symbol = 'GNE'
     the_eq_symbol = 'EQ:%s' % the_symbol
     strategy_symbols = [the_symbol]
     strategy_assets = [the_eq_symbol]
@@ -64,7 +73,7 @@ if __name__ == "__main__":
     data_handler = BacktestDataHandler(strategy_universe, data_sources=[data_source])
 
     signal = MeanReversionSignal(
-        start_dt, strategy_universe, lookbacks=[lookback_window_size]
+        start_dt, strategy_universe, lookbacks=[lookback_window_size], z=1.0
     )
     signals = SignalsCollection({'mean_reversion': signal}, data_handler)
 
@@ -80,7 +89,7 @@ if __name__ == "__main__":
         rebalance='daily',
         long_only=True,
         cash_buffer_percentage=0.0,
-        initial_cash=20000,
+        initial_cash=10000,
         data_handler=data_handler
     )
     strategy_backtest.run()
