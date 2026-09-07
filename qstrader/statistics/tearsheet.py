@@ -349,41 +349,23 @@ class TearsheetStatistics(Statistics):
         has_signal_history = (
             self.signal_history is not None and not self.signal_history.empty
         )
-        vertical_sections = 6 if has_signal_history else 5
+        vertical_sections = 2
         fig = plt.figure(figsize=(16, 14 if has_signal_history else 12))
         fig.suptitle(self.title, y=0.94, weight='bold')
-        gs = gridspec.GridSpec(vertical_sections, 3, wspace=0.25, hspace=0.5)
+        gs = gridspec.GridSpec(vertical_sections, 1)
 
         stats = self.get_results(self.strategy_equity)
         bench_stats = None
         if self.benchmark_equity is not None:
             bench_stats = self.get_results(self.benchmark_equity)
 
-        ax_equity = plt.subplot(gs[:2, :])
-        if has_signal_history:
-            ax_signals = plt.subplot(gs[2, :])
-            drawdown_row = 3
-        else:
-            ax_signals = None
-            drawdown_row = 2
-        ax_drawdown = plt.subplot(gs[drawdown_row, :])
-        ax_monthly_returns = plt.subplot(gs[drawdown_row + 1, :2])
-        ax_yearly_returns = plt.subplot(gs[drawdown_row + 1, 2])
-        ax_txt_curve = plt.subplot(gs[drawdown_row + 2, 0])
-        # ax_txt_trade = plt.subplot(gs[drawdown_row + 2, 1])
-        # ax_txt_time = plt.subplot(gs[drawdown_row + 2, 2])
+        ax_equity = plt.subplot(gs[0, 0])
+        ax_signals = plt.subplot(gs[1, 0])
 
         self._plot_equity(stats, bench_stats=bench_stats, ax=ax_equity)
-        if ax_signals is not None:
-            self._plot_signals(
-                self.signal_history, stats['cum_returns'].index, ax=ax_signals
-            )
-        self._plot_drawdown(stats, ax=ax_drawdown)
-        self._plot_monthly_returns(stats, ax=ax_monthly_returns)
-        self._plot_yearly_returns(stats, ax=ax_yearly_returns)
-        self._plot_txt_curve(stats, bench_stats=bench_stats, ax=ax_txt_curve)
-        # self._plot_txt_trade(stats, ax=ax_txt_trade)
-        # self._plot_txt_time(stats, ax=ax_txt_time)
+        self._plot_signals(
+            self.signal_history, stats['cum_returns'].index, ax=ax_signals
+        )
 
         # Save the figure
         if filename:
@@ -391,6 +373,8 @@ class TearsheetStatistics(Statistics):
                 print(f"Saving tearsheet to {filename}")
             fig = plt.gcf()    
             fig.savefig(filename)
+
+        fig.canvas.manager.full_screen_toggle()
 
         # Plot the figure
         if settings.PRINT_EVENTS:
