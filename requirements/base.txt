@@ -3,3 +3,4 @@ matplotlib>=3.8
 numpy>=2.0.0
 pandas>=2.2
 seaborn>=0.13
+pytz

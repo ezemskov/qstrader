@@ -50,7 +50,7 @@ if __name__ == "__main__":
     lookback_window_size = 40  # Business days
 
     # Construct the symbols and assets necessary for the backtest
-    the_symbol = 'GNE'
+    the_symbol = 'MCY'
     the_eq_symbol = 'EQ:%s' % the_symbol
     strategy_symbols = [the_symbol]
     strategy_assets = [the_eq_symbol]
@@ -58,7 +58,8 @@ if __name__ == "__main__":
 
     # To avoid loading all CSV files in the directory, set the
     # data source to load only those provided symbols
-    csv_dir = os.environ.get('QSTRADER_CSV_DATA_DIR', '.')
+    #csv_dir = os.path.join("C:\\", "eugene", "worspace_stock", "stock", "data")
+    csv_dir = "c:/eugene/worspace_stock/stock/data/";
     data_source = CSVDailyBarDataSource(csv_dir, Equity, csv_symbols=strategy_symbols)
     data_handler = BacktestDataHandler(strategy_universe, data_sources=[data_source])
 
