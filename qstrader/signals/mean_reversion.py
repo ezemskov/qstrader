@@ -13,9 +13,10 @@ class MeanReversionSignal(Signal):
     with their timestamps for plotting after a backtest.
     """
 
-    def __init__(self, start_dt, universe, lookbacks):
+    def __init__(self, start_dt, universe, lookbacks, z = 1.0):
         super().__init__(start_dt, universe, lookbacks)
         self.history = {}
+        self.z = z
 
     @staticmethod
     def _asset_lookback_key(asset, lookback):
@@ -31,7 +32,7 @@ class MeanReversionSignal(Signal):
         average = np.mean(prices)
         stdev = np.std(prices)
         price = prices[-1]
-        return (price, average, stdev, average - stdev, average + stdev)
+        return (price, average, stdev, average - self.z*stdev, average + self.z*stdev)
 
     def append(self, asset, price, dt=None):
         """Append a price and retain its mean-reversion values for plotting."""
