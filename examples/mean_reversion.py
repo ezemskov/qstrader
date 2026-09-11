@@ -1,5 +1,4 @@
-import os
-
+import sys
 import pandas as pd
 import pytz
 
@@ -21,6 +20,7 @@ class MeanReversionAlphaModel(AlphaModel):
         self.universe = universe
         self.target_weight = 0.0
         self.last_buy_price = 0.0
+        self.was_last_stop_loss = False
 
     def __call__(self, dt):
         asset = self.universe.get_assets(dt)[0]
@@ -38,28 +38,35 @@ class MeanReversionAlphaModel(AlphaModel):
 
             loss = max(self.last_buy_price - asset_price_at_dt, 0)
             print(f"Price {asset_price_at_dt:.2f} avg {avg:.2f} stdev {stdev:.2f} bought at {self.last_buy_price:.2f} loss {loss:.2f}")
-            if asset_price_at_dt < lower_band:
+            if (asset_price_at_dt < lower_band) and not self.was_last_stop_loss:
                 self.target_weight = 1.0  # Planned buy                
             if asset_price_at_dt > upper_band:
                 self.target_weight = 0.0  # Planned sell
+                self.last_buy_price = 0.0
+
+            if (asset_price_at_dt >= avg):
+                self.was_last_stop_loss = False  # Price touched average : assume end of drop, buy on next low
 
             if (self.target_weight > prev_weight):
                 self.last_buy_price = asset_price_at_dt
 
             if (self.target_weight > 0) and (loss > stop_loss_band):
                 self.target_weight = 0.0    # Stop-loss sell
+                self.last_buy_price = 0.0
+                self.was_last_stop_loss = True
 
         weights = {asset: self.target_weight}
         return weights
 
 if __name__ == "__main__":
-    start_dt = pd.Timestamp('2025-01-01 10:00:00', tz=pytz.UTC)
-    end_dt = pd.Timestamp('2026-08-01 10:00:00', tz=pytz.UTC)
+    start_dt = pd.Timestamp('2024-10-01 10:00:00', tz=pytz.UTC)
+    end_dt = pd.Timestamp('2026-09-10 10:00:00', tz=pytz.UTC)
 
-    lookback_window_size = 20  # Business days
+    lookback_window_size = 10  # Business days
+    z_value = 0.6
 
     # Construct the symbols and assets necessary for the backtest
-    the_symbol = 'GNE'
+    the_symbol = sys.argv[1]
     the_eq_symbol = 'EQ:%s' % the_symbol
     strategy_symbols = [the_symbol]
     strategy_assets = [the_eq_symbol]
@@ -73,7 +80,7 @@ if __name__ == "__main__":
     data_handler = BacktestDataHandler(strategy_universe, data_sources=[data_source])
 
     signal = MeanReversionSignal(
-        start_dt, strategy_universe, lookbacks=[lookback_window_size], z=1.0
+        start_dt, strategy_universe, lookbacks=[lookback_window_size], z=z_value
     )
     signals = SignalsCollection({'mean_reversion': signal}, data_handler)
 
@@ -116,7 +123,7 @@ if __name__ == "__main__":
     tearsheet = TearsheetStatistics(
         strategy_equity=strategy_backtest.get_equity_curve(),
         benchmark_equity=benchmark_backtest.get_equity_curve(),
-        title=f'{the_symbol} mean reversion',
+        title=f'{the_symbol} mean reversion avg={lookback_window_size}d z={z_value} stdev',
         signal_history=signal.get_history(the_eq_symbol, lookback_window_size)
     )
     tearsheet.plot_results()
