@@ -345,9 +345,9 @@ class TearsheetStatistics(Statistics):
         sns.set_context(rc)
         sns.set_style("whitegrid")
         sns.set_palette("deep", desat=.6)
-
         has_signal_history = (
             self.signal_history is not None and not self.signal_history.empty
+
         )
         vertical_sections = 2
         fig = plt.figure(figsize=(16, 14 if has_signal_history else 12))
@@ -372,9 +372,10 @@ class TearsheetStatistics(Statistics):
             if settings.PRINT_EVENTS:
                 print(f"Saving tearsheet to {filename}")
             fig = plt.gcf()    
-            fig.savefig(filename)
+            fig.savefig(filename, dpi=300)
 
         fig.canvas.manager.full_screen_toggle()
+
 
         # Plot the figure
         if settings.PRINT_EVENTS:

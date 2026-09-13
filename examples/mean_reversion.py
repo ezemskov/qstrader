@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 import pandas as pd
 import pytz
@@ -71,11 +73,11 @@ if __name__ == "__main__":
     strategy_symbols = [the_symbol]
     strategy_assets = [the_eq_symbol]
     strategy_universe = StaticUniverse(strategy_assets)
-
     # To avoid loading all CSV files in the directory, set the
     # data source to load only those provided symbols
     #csv_dir = os.path.join("C:\\", "eugene", "worspace_stock", "stock", "data")
-    csv_dir = "c:/eugene/worspace_stock/stock/data/";
+    csv_dir = "../../stock/data/";
+
     data_source = CSVDailyBarDataSource(csv_dir, Equity, csv_symbols=strategy_symbols)
     data_handler = BacktestDataHandler(strategy_universe, data_sources=[data_source])
 
@@ -126,4 +128,4 @@ if __name__ == "__main__":
         title=f'{the_symbol} mean reversion avg={lookback_window_size}d z={z_value} stdev',
         signal_history=signal.get_history(the_eq_symbol, lookback_window_size)
     )
-    tearsheet.plot_results()
+    tearsheet.plot_results(filename=f"{the_symbol}.svg")
