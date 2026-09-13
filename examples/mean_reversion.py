@@ -3,6 +3,7 @@
 import sys
 import pandas as pd
 import pytz
+from os import path
 
 from qstrader.alpha_model.alpha_model import AlphaModel
 from qstrader.alpha_model.fixed_signals import FixedSignalsAlphaModel
@@ -61,8 +62,17 @@ class MeanReversionAlphaModel(AlphaModel):
         return weights
 
 if __name__ == "__main__":
-    start_dt = pd.Timestamp('2024-10-01 10:00:00', tz=pytz.UTC)
-    end_dt = pd.Timestamp('2026-09-10 10:00:00', tz=pytz.UTC)
+    start_date_str = '2015-10-01'
+    end_date_str = '2026-09-01'
+    the_symbol = sys.argv[1]
+
+    if (len(sys.argv) > 2):
+        start_date_str = sys.argv[2]
+    if (len(sys.argv) > 3):
+        end_date_str = sys.argv[3]
+
+    start_dt = pd.Timestamp(start_date_str, tz=pytz.UTC)
+    end_dt = pd.Timestamp(end_date_str, tz=pytz.UTC)
 
     lookback_window_size = 10  # Business days
     z_value = 0.6
@@ -78,7 +88,7 @@ if __name__ == "__main__":
     #csv_dir = os.path.join("C:\\", "eugene", "worspace_stock", "stock", "data")
     csv_dir = "../../stock/data/";
 
-    data_source = CSVDailyBarDataSource(csv_dir, Equity, csv_symbols=strategy_symbols)
+    data_source = CSVDailyBarDataSource(csv_dir, Equity, csv_symbols=strategy_symbols, adjust_prices=False)
     data_handler = BacktestDataHandler(strategy_universe, data_sources=[data_source])
 
     signal = MeanReversionSignal(
@@ -128,4 +138,4 @@ if __name__ == "__main__":
         title=f'{the_symbol} mean reversion avg={lookback_window_size}d z={z_value} stdev',
         signal_history=signal.get_history(the_eq_symbol, lookback_window_size)
     )
-    tearsheet.plot_results(filename=f"{the_symbol}.svg")
+    tearsheet.plot_results(filename=path.join(csv_dir, f"{the_symbol}.svg"))
