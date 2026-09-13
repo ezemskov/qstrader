@@ -65,17 +65,21 @@ if __name__ == "__main__":
     start_date_str = '2015-10-01'
     end_date_str = '2026-09-01'
     the_symbol = sys.argv[1]
+    lookback_window_size = 10  # Business days
+    z_value = 1.0
 
     if (len(sys.argv) > 2):
         start_date_str = sys.argv[2]
     if (len(sys.argv) > 3):
         end_date_str = sys.argv[3]
+    if (len(sys.argv) > 4):
+        lookback_window_size = int(sys.argv[4])
+    if (len(sys.argv) > 5):
+        z_value = float(sys.argv[5])
 
     start_dt = pd.Timestamp(start_date_str, tz=pytz.UTC)
     end_dt = pd.Timestamp(end_date_str, tz=pytz.UTC)
 
-    lookback_window_size = 10  # Business days
-    z_value = 0.6
 
     # Construct the symbols and assets necessary for the backtest
     the_symbol = sys.argv[1]
