@@ -34,6 +34,19 @@ class MeanReversionSignal(Signal):
         price = prices[-1]
         return (price, average, stdev, average - self.z*stdev, average + self.z*stdev)
 
+    def _long_average(self, asset):
+        if len(self.lookbacks) < 2:
+            return np.nan
+
+        long_lookback = self.lookbacks[1]
+        prices = self.buffers.prices[
+            self._asset_lookback_key(asset, long_lookback)
+        ]
+        if len(prices) < long_lookback:
+            return np.nan
+
+        return np.mean(prices)
+
     def append(self, asset, price, dt=None):
         """Append a price and retain its mean-reversion values for plotting."""
         super().append(asset, price, dt)
@@ -41,17 +54,20 @@ class MeanReversionSignal(Signal):
         for lookback in self.lookbacks:
             key = self._asset_lookback_key(asset, lookback)
             self.history.setdefault(key, []).append(
-                (dt,) + self._values(asset, lookback)
+                (dt,) + self._values(asset, lookback) + (self._long_average(asset),)
             )
 
     def __call__(self, asset, lookback):
-        """Return ``(price, average, stdev, lower_band, upper_band)``."""
-        return self._values(asset, lookback)
+        """Return price, short-window values, and the long-window average."""
+        return self._values(asset, lookback) + (self._long_average(asset),)
 
     def get_history(self, asset, lookback):
         """Return timestamped price, average, deviation, and band values."""
         key = self._asset_lookback_key(asset, lookback)
         return pd.DataFrame(
             self.history.get(key, []),
-            columns=['Date', 'Price', 'Average', 'Stdev', 'Lower Band', 'Upper Band']
+            columns=[
+                'Date', 'Price', 'Average', 'Stdev', 'Lower Band', 'Upper Band',
+                'Long Average'
+            ]
         ).set_index('Date')

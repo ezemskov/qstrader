@@ -31,7 +31,7 @@ class MeanReversionAlphaModel(AlphaModel):
         # The signal buffers require a full lookback window before an
         # average can be calculated. Until then, remain unallocated.
         if self.signals.warmup >= self.lookback_window_size:
-            asset_price_at_dt, avg, stdev, lower_band, upper_band = \
+            asset_price_at_dt, avg, stdev, lower_band, upper_band, long_average = \
                 self.signals['mean_reversion'](
                     asset, self.lookback_window_size
                 )
@@ -41,7 +41,8 @@ class MeanReversionAlphaModel(AlphaModel):
 
             loss = max(self.last_buy_price - asset_price_at_dt, 0)
             print(f"Price {asset_price_at_dt:.2f} avg {avg:.2f} stdev {stdev:.2f} bought at {self.last_buy_price:.2f} loss {loss:.2f}")
-            if (asset_price_at_dt < lower_band) and not self.was_last_stop_loss:
+            if (asset_price_at_dt < lower_band) and \
+               (asset_price_at_dt > long_average) and not self.was_last_stop_loss:
                 self.target_weight = 1.0  # Planned buy                
             if asset_price_at_dt > upper_band:
                 self.target_weight = 0.0  # Planned sell
@@ -65,7 +66,7 @@ if __name__ == "__main__":
     start_date_str = '2015-10-01'
     end_date_str = '2026-09-01'
     the_symbol = sys.argv[1]
-    lookback_window_size = 10  # Business days
+    lookback_window_sizes = [10, 200]   # Business days
     z_value = 1.0
 
     if (len(sys.argv) > 2):
@@ -73,9 +74,11 @@ if __name__ == "__main__":
     if (len(sys.argv) > 3):
         end_date_str = sys.argv[3]
     if (len(sys.argv) > 4):
-        lookback_window_size = int(sys.argv[4])
+        lookback_window_sizes[0] = int(sys.argv[4])
     if (len(sys.argv) > 5):
-        z_value = float(sys.argv[5])
+        lookback_window_sizes[1] = int(sys.argv[5])
+    if (len(sys.argv) > 6):
+        z_value = float(sys.argv[6])
 
     start_dt = pd.Timestamp(start_date_str, tz=pytz.UTC)
     end_dt = pd.Timestamp(end_date_str, tz=pytz.UTC)
@@ -96,12 +99,12 @@ if __name__ == "__main__":
     data_handler = BacktestDataHandler(strategy_universe, data_sources=[data_source])
 
     signal = MeanReversionSignal(
-        start_dt, strategy_universe, lookbacks=[lookback_window_size], z=z_value
+        start_dt, strategy_universe, lookbacks=lookback_window_sizes, z=z_value
     )
     signals = SignalsCollection({'mean_reversion': signal}, data_handler)
 
     strategy_alpha_model = MeanReversionAlphaModel(
-        signals, lookback_window_size, strategy_universe
+        signals, lookback_window_sizes[0], strategy_universe
     )
     strategy_backtest = BacktestTradingSession(
         start_dt,
@@ -136,10 +139,11 @@ if __name__ == "__main__":
     benchmark_backtest.run()
 
     # Performance Output
+    lws = lookback_window_sizes
     tearsheet = TearsheetStatistics(
         strategy_equity=strategy_backtest.get_equity_curve(),
         benchmark_equity=benchmark_backtest.get_equity_curve(),
-        title=f'{the_symbol} mean reversion avg={lookback_window_size}d z={z_value} stdev',
-        signal_history=signal.get_history(the_eq_symbol, lookback_window_size)
+        title=f'{the_symbol} mean reversion avg={lws[0]}d/{lws[1]}d z={z_value} stdev',
+        signal_history=signal.get_history(the_eq_symbol, lookback_window_sizes[0])
     )
     tearsheet.plot_results(filename=path.join(csv_dir, f"{the_symbol}.svg"))
