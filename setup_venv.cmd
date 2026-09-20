@@ -1,3 +1,4 @@
-@set PYTHONPATH=C:\eugene\worspace_stock\qstrader
-@.venv\Scripts\activate.bat
-cd examples
+@set PYTHONPATH=C:\eugene\workspace_stock\qstrader
+cd %PYTHONPATH%
+@ .venv\Scripts\activate.bat
+#cd examples
