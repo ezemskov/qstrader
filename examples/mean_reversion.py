@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import sys
 import pandas as pd
 import pytz
@@ -42,7 +40,7 @@ class MeanReversionAlphaModel(AlphaModel):
             loss = max(self.last_buy_price - asset_price_at_dt, 0)
             print(f"Price {asset_price_at_dt:.2f} avg {avg:.2f} stdev {stdev:.2f} bought at {self.last_buy_price:.2f} loss {loss:.2f}")
             if (asset_price_at_dt < lower_band) and \
-               (asset_price_at_dt > long_average) and not self.was_last_stop_loss:
+               (asset_price_at_dt >= long_average) and not self.was_last_stop_loss:
                 self.target_weight = 1.0  # Planned buy                
             if asset_price_at_dt > upper_band:
                 self.target_weight = 0.0  # Planned sell
@@ -66,7 +64,7 @@ if __name__ == "__main__":
     start_date_str = '2015-10-01'
     end_date_str = '2026-09-01'
     the_symbol = sys.argv[1]
-    lookback_window_sizes = [10, 200]   # Business days
+    lookback_window_sizes = [10, 1]   # Business days
     z_value = 1.0
 
     if (len(sys.argv) > 2):
