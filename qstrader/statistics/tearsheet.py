@@ -148,6 +148,45 @@ class TearsheetStatistics(Statistics):
         ax.legend(loc='best', ncol=2)
         return ax
 
+    def _plot_adx(self, signal_history, equity_index, ax=None):
+        """Plot ADX with its positive and negative directional indicators."""
+        if ax is None:
+            ax = plt.gca()
+
+        adx_columns = {'DI+', 'DI-', 'ADX'}
+        if (
+            signal_history is None or signal_history.empty
+            or not adx_columns.issubset(signal_history.columns)
+        ):
+            ax.set_visible(False)
+            return ax
+
+        signal_history = signal_history.copy()
+        signal_history.index = pd.to_datetime(
+            signal_history.index, utc=True
+        ).tz_localize(None).normalize()
+        equity_index = pd.DatetimeIndex(pd.to_datetime(equity_index)).normalize()
+        signal_history = signal_history.reindex(equity_index).bfill().ffill()
+        plot_dates = signal_history.index.to_pydatetime()
+
+        ax.plot(plot_dates, signal_history['ADX'].to_numpy(),
+                color='navy', lw=1.5, label='ADX')
+        ax.plot(plot_dates, signal_history['DI+'].to_numpy(),
+                color='forestgreen', lw=1.0, label='DI+')
+        ax.plot(plot_dates, signal_history['DI-'].to_numpy(),
+                color='firebrick', lw=1.0, label='DI-')
+        ax.axhline(20.0, color='black', lw=1.0, ls='--', label='Threshold 20')
+        ax.margins(x=0.05)
+        ax.set_title('ADX and Directional Indicators', fontweight='bold')
+        ax.set_ylabel('ADX / DI')
+        ax.xaxis.set_major_locator(mdates.MonthLocator(bymonthday=1))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%b\n%Y'))
+        ax.yaxis.grid(linestyle=':')
+        ax.xaxis.grid(linestyle=':')
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+        ax.legend(loc='best', ncol=4)
+        return ax
+
     def _plot_drawdown(self, stats, ax=None, **kwargs):
         """
         Plots the underwater curve
@@ -351,8 +390,12 @@ class TearsheetStatistics(Statistics):
             self.signal_history is not None and not self.signal_history.empty
 
         )
-        vertical_sections = 2
-        fig = plt.figure(figsize=(16, 14 if has_signal_history else 12))
+        has_adx = (
+            has_signal_history
+            and {'DI+', 'DI-', 'ADX'}.issubset(self.signal_history.columns)
+        )
+        vertical_sections = 3 if has_adx else 2
+        fig = plt.figure(figsize=(16, 16 if has_adx else (14 if has_signal_history else 12)))
         fig.suptitle(self.title, y=0.94, weight='bold')
         gs = gridspec.GridSpec(vertical_sections, 1)
 
@@ -368,6 +411,11 @@ class TearsheetStatistics(Statistics):
         self._plot_signals(
             self.signal_history, stats['cum_returns'].index, ax=ax_signals
         )
+        if has_adx:
+            ax_adx = plt.subplot(gs[2, 0])
+            self._plot_adx(
+                self.signal_history, stats['cum_returns'].index, ax=ax_adx
+            )
 
         # Save the figure
         if filename:
