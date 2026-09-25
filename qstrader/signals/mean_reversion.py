@@ -151,8 +151,11 @@ class MeanReversionSignal(Signal):
             'previous_price': None,
             'gains': [],
             'losses': [],
+            'raw_gains': [],
+            'raw_losses': [],
             'up': None,
             'down': None,
+            'raw_value': np.nan,
             'value': np.nan
         })
         previous_price = state['previous_price']
@@ -163,6 +166,15 @@ class MeanReversionSignal(Signal):
         change = price - previous_price
         gain = max(change, 0.0)
         loss = -min(change, 0.0)
+        state['raw_gains'].append(gain)
+        state['raw_losses'].append(loss)
+        if len(state['raw_gains']) > lookback:
+            state['raw_gains'].pop(0)
+            state['raw_losses'].pop(0)
+        if len(state['raw_gains']) == lookback:
+            state['raw_value'] = self._rsi_from_averages(
+                np.mean(state['raw_gains']), np.mean(state['raw_losses'])
+            )
         if state['up'] is None:
             state['gains'].append(gain)
             state['losses'].append(loss)
@@ -185,6 +197,11 @@ class MeanReversionSignal(Signal):
         key = self._asset_lookback_key(asset, lookback)
         return self.rsi.get(key, {}).get('value', np.nan)
 
+    def _raw_rsi(self, asset, lookback):
+        """Return the latest unsmoothed RSI for an asset and lookback period."""
+        key = self._asset_lookback_key(asset, lookback)
+        return self.rsi.get(key, {}).get('raw_value', np.nan)
+
     def append(self, asset, price, dt=None, high=None, low=None):
         """Append a price and retain its mean-reversion values for plotting."""
         super().append(asset, price, dt)
@@ -206,7 +223,7 @@ class MeanReversionSignal(Signal):
             self.history.setdefault(key, []).append(
                 (dt,) + self._values(asset, lookback) + (
                     self._long_average(asset), di_plus, di_minus, adx,
-                    self._rsi(asset, lookback)
+                    self._raw_rsi(asset, lookback), self._rsi(asset, lookback)
                 )
             )
 
@@ -215,13 +232,13 @@ class MeanReversionSignal(Signal):
         return self._values(asset, lookback) + (self._long_average(asset),)
 
     def get_history(self, asset, lookback):
-        """Return timestamped statistics, bands, ADX values, and RSI."""
+        """Return timestamped statistics, bands, ADX, and RSI values."""
         key = self._asset_lookback_key(asset, lookback)
         return pd.DataFrame(
             self.history.get(key, []),
             columns=[
                 'Date', 'Price', 'Average', 'Stdev', 'Lower Band', 'Upper Band',
-                'Long Average', 'DI+', 'DI-', 'ADX', 'RSI'
+                'Long Average', 'DI+', 'DI-', 'ADX', 'Raw RSI', 'RSI'
             ]
         ).set_index('Date')
 

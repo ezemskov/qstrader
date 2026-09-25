@@ -29,7 +29,7 @@ def test_mean_reversion_signal_calculates_and_records_bands():
     history = signal.get_history('EQ:SPY', 3)
     assert list(history.columns) == [
         'Price', 'Average', 'Stdev', 'Lower Band', 'Upper Band', 'Long Average',
-        'DI+', 'DI-', 'ADX', 'RSI'
+        'DI+', 'DI-', 'ADX', 'Raw RSI', 'RSI'
     ]
     assert history['Average'].iloc[0] != history['Average'].iloc[0]
     assert history['Price'].iloc[-1] == 18.0
@@ -53,6 +53,8 @@ def test_mean_reversion_signal_calculates_pine_rsi():
     assert np.isclose(signal.get_rsi('EQ:SPY', 3), 200.0 / 3.0)
 
     history = signal.get_history('EQ:SPY', 3)
+    assert np.isnan(history['Raw RSI'].iloc[2])
+    assert np.isclose(history['Raw RSI'].iloc[-1], 60.0)
     assert np.isnan(history['RSI'].iloc[2])
     assert np.isclose(history['RSI'].iloc[-1], 200.0 / 3.0)
 
@@ -76,5 +78,5 @@ def test_mean_reversion_signal_calculates_pine_adx_from_ohlc():
     assert adx == 100.0
 
     history = signal.get_history('EQ:SPY', 3)
-    assert list(history.columns)[-3:] == ['DI+', 'DI-', 'ADX']
+    assert {'DI+', 'DI-', 'ADX'}.issubset(history.columns)
     assert history['ADX'].iloc[-1] == adx
