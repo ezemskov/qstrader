@@ -19,7 +19,7 @@ from qstrader.trading.backtest import BacktestTradingSession
 class MeanReversionAlphaModel(AlphaModel):
     def __init__(
         self, signals, short_lookback_window_size,
-        long_lookback_window_size, universe
+        long_lookback_window_size, stop_loss_adx, universe
     ):
         self.signals = signals
         self.short_lookback_window_size = short_lookback_window_size
@@ -28,6 +28,7 @@ class MeanReversionAlphaModel(AlphaModel):
         self.target_weight = 0.0
         self.last_buy_price = 0.0
         self.was_last_stop_loss = False
+        self.stop_loss_adx = stop_loss_adx
 
     def __call__(self, dt):
         asset = self.universe.get_assets(dt)[0]
@@ -52,8 +53,7 @@ class MeanReversionAlphaModel(AlphaModel):
 
             prev_weight = self.target_weight
             stop_loss_band = 2 * stdev
-            stop_loss_rsi = 0   
-            stop_loss_adx = 20
+            stop_loss_rsi = 0
 
             loss = max(self.last_buy_price - asset_price_at_dt, 0)
             print(
@@ -77,7 +77,7 @@ class MeanReversionAlphaModel(AlphaModel):
 
             if (self.target_weight > 0) and \
                ((loss > stop_loss_band) and 
-                (adx > stop_loss_adx) or (rsi < stop_loss_rsi)):
+                ((adx > self.stop_loss_adx) or (rsi < stop_loss_rsi))):
                 self.target_weight = 0.0    # Stop-loss sell
                 self.last_buy_price = 0.0
                 self.was_last_stop_loss = True
@@ -92,6 +92,7 @@ if __name__ == "__main__":
     short_lookback_window_size = 14  # Business days
     long_lookback_window_size = 1  # Business days
     z_value = 1.0
+    stop_loss_adx = 0
 
     if (len(sys.argv) > 2):
         start_date_str = sys.argv[2]
@@ -103,6 +104,8 @@ if __name__ == "__main__":
         long_lookback_window_size = int(sys.argv[5])
     if (len(sys.argv) > 6):
         z_value = float(sys.argv[6])
+    if (len(sys.argv) > 7):
+        stop_loss_adx = float(sys.argv[7])
 
     start_dt = pd.Timestamp(start_date_str, tz=pytz.UTC)
     end_dt = pd.Timestamp(end_date_str, tz=pytz.UTC)
@@ -143,7 +146,7 @@ if __name__ == "__main__":
 
     strategy_alpha_model = MeanReversionAlphaModel(
         signals, short_lookback_window_size, long_lookback_window_size,
-        strategy_universe
+        stop_loss_adx, strategy_universe
     )
     strategy_backtest = BacktestTradingSession(
         start_dt,
