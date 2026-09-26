@@ -216,16 +216,21 @@ class MeanReversionSignal(Signal):
             bars['low'].append(low)
             bars['close'].append(price)
 
-        for lookback in self.lookbacks:
-            key = self._asset_lookback_key(asset, lookback)
-            self._append_rsi(asset, price, lookback)
-            di_plus, di_minus, adx = self._adx(asset, lookback)
-            self.history.setdefault(key, []).append(
-                (dt,) + self._values(asset, lookback) + (
-                    self._long_average(asset), di_plus, di_minus, adx,
-                    self._raw_rsi(asset, lookback), self._rsi(asset, lookback)
-                )
+        lookback_len = self.lookbacks[0] #short lookback
+        key = self._asset_lookback_key(asset, lookback_len)
+        self._append_rsi(asset, price, lookback_len)
+
+        di_plus, di_minus, adx = self._adx(asset, lookback_len)
+        self.history.setdefault(key, []).append(
+            (dt,) + self._values(asset, lookback_len) + (
+                self._long_average(asset), 
+                di_plus, 
+                di_minus, 
+                adx,
+                self._raw_rsi(asset, lookback_len), 
+                self._rsi(asset, lookback_len)
             )
+        )
 
     def __call__(self, asset, lookback):
         """Return price, short-window values, and the long-window average."""
