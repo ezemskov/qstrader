@@ -17,9 +17,13 @@ from qstrader.statistics.tearsheet import TearsheetStatistics
 from qstrader.trading.backtest import BacktestTradingSession
 
 class MeanReversionAlphaModel(AlphaModel):
-    def __init__(self, signals, lookback_window_size, universe):
+    def __init__(
+        self, signals, short_lookback_window_size,
+        long_lookback_window_size, universe
+    ):
         self.signals = signals
-        self.lookback_window_size = lookback_window_size
+        self.short_lookback_window_size = short_lookback_window_size
+        self.long_lookback_window_size = long_lookback_window_size
         self.universe = universe
         self.target_weight = 0.0
         self.last_buy_price = 0.0
@@ -30,18 +34,20 @@ class MeanReversionAlphaModel(AlphaModel):
 
         # The signal buffers require a full lookback window before an
         # average can be calculated. Until then, remain unallocated.
-        if self.signals.warmup >= self.lookback_window_size:
+        if self.signals.warmup >= max(
+            self.short_lookback_window_size,
+            self.long_lookback_window_size
+        ):
             (
                 asset_price_at_dt, avg, stdev, lower_band, upper_band,
-                zscore, long_average
-            ) = self.signals['zscore'](
-                    asset, self.lookback_window_size
-                )
+                zscore
+            ) = self.signals['zscore_short'](asset)
+            long_average = self.signals['zscore_long'](asset)[1]
             raw_rsi, rsi = self.signals['rsi'](
-                asset, self.lookback_window_size
+                asset, self.short_lookback_window_size
             )
             di_plus, di_minus, adx = self.signals['adx'](
-                asset, self.lookback_window_size
+                asset, self.short_lookback_window_size
             )
 
             prev_weight = self.target_weight
@@ -79,7 +85,8 @@ if __name__ == "__main__":
     start_date_str = '2015-10-01'
     end_date_str = '2026-09-01'
     the_symbol = sys.argv[1]
-    lookback_window_sizes = [14, 1]   # Business days
+    short_lookback_window_size = 14  # Business days
+    long_lookback_window_size = 1  # Business days
     z_value = 1.0
 
     if (len(sys.argv) > 2):
@@ -87,9 +94,9 @@ if __name__ == "__main__":
     if (len(sys.argv) > 3):
         end_date_str = sys.argv[3]
     if (len(sys.argv) > 4):
-        lookback_window_sizes[0] = int(sys.argv[4])
+        short_lookback_window_size = int(sys.argv[4])
     if (len(sys.argv) > 5):
-        lookback_window_sizes[1] = int(sys.argv[5])
+        long_lookback_window_size = int(sys.argv[5])
     if (len(sys.argv) > 6):
         z_value = float(sys.argv[6])
 
@@ -111,19 +118,28 @@ if __name__ == "__main__":
     data_source = CSVDailyBarDataSource(csv_dir, Equity, csv_symbols=strategy_symbols, adjust_prices=False)
     data_handler = BacktestDataHandler(strategy_universe, data_sources=[data_source])
 
-    zscore_signal = ZScoreSignal(
-        start_dt, strategy_universe, lookbacks=lookback_window_sizes, z=z_value
+    zscore_short_signal = ZScoreSignal(
+        start_dt, strategy_universe, short_lookback_window_size, z=z_value
     )
-    adx_signal = ADXSignal(start_dt, strategy_universe, lookbacks=lookback_window_sizes)
-    rsi_signal = RSISignal(start_dt, strategy_universe, lookbacks=lookback_window_sizes)
+    zscore_long_signal = ZScoreSignal(
+        start_dt, strategy_universe, long_lookback_window_size, z=z_value
+    )
+    adx_signal = ADXSignal(
+        start_dt, strategy_universe, lookbacks=[short_lookback_window_size]
+    )
+    rsi_signal = RSISignal(
+        start_dt, strategy_universe, lookbacks=[short_lookback_window_size]
+    )
     signals = SignalsCollection({
-        'zscore': zscore_signal,
+        'zscore_short': zscore_short_signal,
+        'zscore_long': zscore_long_signal,
         'adx': adx_signal,
         'rsi': rsi_signal
     }, data_handler)
 
     strategy_alpha_model = MeanReversionAlphaModel(
-        signals, lookback_window_sizes[0], strategy_universe
+        signals, short_lookback_window_size, long_lookback_window_size,
+        strategy_universe
     )
     strategy_backtest = BacktestTradingSession(
         start_dt,
@@ -158,15 +174,30 @@ if __name__ == "__main__":
     benchmark_backtest.run()
 
     # Performance Output
-    lws = lookback_window_sizes
     tearsheet = TearsheetStatistics(
         strategy_equity=strategy_backtest.get_equity_curve(),
         benchmark_equity=benchmark_backtest.get_equity_curve(),
-        title=f'{the_symbol} mean reversion avg={lws[0]}d/{lws[1]}d z={z_value} stdev',
+        title=(
+            f'{the_symbol} mean reversion '
+            f'avg={short_lookback_window_size}d/'
+            f'{long_lookback_window_size}d z={z_value} stdev'
+        ),
         signal_history=(
-            zscore_signal.get_history(the_eq_symbol, lookback_window_sizes[0])
-            .join(adx_signal.get_history(the_eq_symbol, lookback_window_sizes[0]))
-            .join(rsi_signal.get_history(the_eq_symbol, lookback_window_sizes[0]))
+            zscore_short_signal.get_history(the_eq_symbol)
+            .join(
+                zscore_long_signal.get_history(the_eq_symbol)[['Average']]
+                .rename(columns={'Average': 'Long Average'})
+            )
+            .join(
+                adx_signal.get_history(
+                    the_eq_symbol, short_lookback_window_size
+                )
+            )
+            .join(
+                rsi_signal.get_history(
+                    the_eq_symbol, short_lookback_window_size
+                )
+            )
         )
     )
     tearsheet.plot_results(filename=path.join(csv_dir, f"{the_symbol}.svg"))
