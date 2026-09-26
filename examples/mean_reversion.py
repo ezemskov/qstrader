@@ -6,8 +6,10 @@ from os import path
 from qstrader.alpha_model.alpha_model import AlphaModel
 from qstrader.alpha_model.fixed_signals import FixedSignalsAlphaModel
 from qstrader.asset.equity import Equity
-from qstrader.signals.mean_reversion import MeanReversionSignal
+from qstrader.signals.adx import ADXSignal
+from qstrader.signals.rsi import RSISignal
 from qstrader.signals.signals_collection import SignalsCollection
+from qstrader.signals.zscore import ZScoreSignal
 from qstrader.asset.universe.static import StaticUniverse
 from qstrader.data.backtest_data_handler import BacktestDataHandler
 from qstrader.data.daily_bar_csv import CSVDailyBarDataSource
@@ -29,18 +31,31 @@ class MeanReversionAlphaModel(AlphaModel):
         # The signal buffers require a full lookback window before an
         # average can be calculated. Until then, remain unallocated.
         if self.signals.warmup >= self.lookback_window_size:
-            asset_price_at_dt, avg, stdev, lower_band, upper_band, long_average = \
-                self.signals['mean_reversion'](
+            (
+                asset_price_at_dt, avg, stdev, lower_band, upper_band,
+                zscore, long_average
+            ) = self.signals['zscore'](
                     asset, self.lookback_window_size
                 )
+            raw_rsi, rsi = self.signals['rsi'](
+                asset, self.lookback_window_size
+            )
+            di_plus, di_minus, adx = self.signals['adx'](
+                asset, self.lookback_window_size
+            )
 
             prev_weight = self.target_weight
             stop_loss_band = 2 * stdev
 
             loss = max(self.last_buy_price - asset_price_at_dt, 0)
-            print(f"Price {asset_price_at_dt:.2f} avg {avg:.2f} stdev {stdev:.2f} bought at {self.last_buy_price:.2f} loss {loss:.2f}")
+            print(
+                f"Price {asset_price_at_dt:.2f} z-score {zscore:.2f} "
+                f"RSI {raw_rsi:.1f} <RSI> {rsi:.1f} ADX {adx:.2f} bought at "
+                f"{self.last_buy_price:.2f} loss {loss:.2f}"
+            )
             if (asset_price_at_dt < lower_band) and \
-               (asset_price_at_dt >= long_average) and not self.was_last_stop_loss:
+               (asset_price_at_dt >= long_average) and \
+               (not self.was_last_stop_loss):
                 self.target_weight = 1.0  # Planned buy                
             if asset_price_at_dt > upper_band:
                 self.target_weight = 0.0  # Planned sell
@@ -64,7 +79,7 @@ if __name__ == "__main__":
     start_date_str = '2015-10-01'
     end_date_str = '2026-09-01'
     the_symbol = sys.argv[1]
-    lookback_window_sizes = [10, 1]   # Business days
+    lookback_window_sizes = [14, 1]   # Business days
     z_value = 1.0
 
     if (len(sys.argv) > 2):
@@ -96,10 +111,16 @@ if __name__ == "__main__":
     data_source = CSVDailyBarDataSource(csv_dir, Equity, csv_symbols=strategy_symbols, adjust_prices=False)
     data_handler = BacktestDataHandler(strategy_universe, data_sources=[data_source])
 
-    signal = MeanReversionSignal(
+    zscore_signal = ZScoreSignal(
         start_dt, strategy_universe, lookbacks=lookback_window_sizes, z=z_value
     )
-    signals = SignalsCollection({'mean_reversion': signal}, data_handler)
+    adx_signal = ADXSignal(start_dt, strategy_universe, lookbacks=lookback_window_sizes)
+    rsi_signal = RSISignal(start_dt, strategy_universe, lookbacks=lookback_window_sizes)
+    signals = SignalsCollection({
+        'zscore': zscore_signal,
+        'adx': adx_signal,
+        'rsi': rsi_signal
+    }, data_handler)
 
     strategy_alpha_model = MeanReversionAlphaModel(
         signals, lookback_window_sizes[0], strategy_universe
@@ -142,6 +163,10 @@ if __name__ == "__main__":
         strategy_equity=strategy_backtest.get_equity_curve(),
         benchmark_equity=benchmark_backtest.get_equity_curve(),
         title=f'{the_symbol} mean reversion avg={lws[0]}d/{lws[1]}d z={z_value} stdev',
-        signal_history=signal.get_history(the_eq_symbol, lookback_window_sizes[0])
+        signal_history=(
+            zscore_signal.get_history(the_eq_symbol, lookback_window_sizes[0])
+            .join(adx_signal.get_history(the_eq_symbol, lookback_window_sizes[0]))
+            .join(rsi_signal.get_history(the_eq_symbol, lookback_window_sizes[0]))
+        )
     )
     tearsheet.plot_results(filename=path.join(csv_dir, f"{the_symbol}.svg"))
