@@ -52,6 +52,8 @@ class MeanReversionAlphaModel(AlphaModel):
 
             prev_weight = self.target_weight
             stop_loss_band = 2 * stdev
+            stop_loss_rsi = 0   
+            stop_loss_adx = 20
 
             loss = max(self.last_buy_price - asset_price_at_dt, 0)
             print(
@@ -73,7 +75,9 @@ class MeanReversionAlphaModel(AlphaModel):
             if (self.target_weight > prev_weight):
                 self.last_buy_price = asset_price_at_dt
 
-            if (self.target_weight > 0) and (loss > stop_loss_band):
+            if (self.target_weight > 0) and \
+               ((loss > stop_loss_band) and 
+                (adx > stop_loss_adx) or (rsi < stop_loss_rsi)):
                 self.target_weight = 0.0    # Stop-loss sell
                 self.last_buy_price = 0.0
                 self.was_last_stop_loss = True
